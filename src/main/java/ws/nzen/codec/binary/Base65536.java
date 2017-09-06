@@ -1,6 +1,7 @@
 /** see ../../../../../../../LICENSE for release rights */
 package ws.nzen.codec.binary;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -8,9 +9,14 @@ import java.util.Map;
  */
 public class Base65536
 {
-	protected static final int NO_BYTE = -1; 
+	protected static final int LAST_BYTE_AS_IND = -1;
+	protected static final int LAST_BYTE_AS_PT = 5376;
+	protected static final int MAX_BYTE = 255; // aka (1 << 8) -1
+	protected static final int MAP_SIZE = 257;
 	protected static Map<Integer, Integer> pointsToEncode
-			= new HashMap<>(); // FIX these are shorts in the example ;; actually short key ; int val
+			= new HashMap<>( MAP_SIZE); // this could have been an array
+	protected static Map<Integer, Integer> decodeFromPoints
+			= new HashMap<>( MAP_SIZE );
 
 
 	public static String encode( byte[] input )
@@ -28,7 +34,7 @@ public class Base65536
 			front = (short)input[ ind ];
 			if ( ind +1 >= input.length )
 			{
-				back = -1;
+				back = LAST_BYTE_AS_IND;
 			}
 			else
 			{
@@ -44,10 +50,86 @@ public class Base65536
 				System.out.print( "  => "+ nn );
 			}
 			System.out.println();
-			short onlyOneCharExpected = 0;
-			result.append( fromCodePoint[ onlyOneCharExpected ] );
+			result.append( fromCodePoint );
 		}
 		return result.toString();
+	}
+
+
+	public static String encode( byte[] input, int wrapAt )
+	{
+		StringBuilder output = new StringBuilder( encode( input ) );
+		int lim = output.length();
+		for ( int ind = wrapAt; ind < lim -1; ind += wrapAt )
+		{
+			output.insert( ind, '\n' );
+			lim += 1; // to handle the increased size
+		}
+		return output.toString();
+	}
+
+
+	/** decode, assumes strict mode */
+	public static byte[] decode( String inB65536 )
+	{
+		final boolean strict = true;
+		return decode( inB65536, strict );
+	}
+
+
+	/**  */
+	public static byte[] decode( String inB65536, boolean strict )
+			throws RuntimeException
+	{
+		if ( inB65536 == null )
+		{
+			return null;
+		}
+		else if ( inB65536.isEmpty() )
+		{
+			return new byte[ 0 ];
+		}
+		ensureDecoderReady();
+		int[] pointsAsData = inB65536.codePoints().toArray();
+		ArrayList<Byte> output = new ArrayList<>( pointsAsData.length *2 );
+		int cpInd = 0, cpLim = pointsAsData.length;
+		for ( int asPoint : pointsAsData )
+		{
+			if ( strict && ( /*Character.isJavaIdentifierPart( asPoint ) // too broad
+					||*/ Character.isSpaceChar( asPoint ) ) )
+			{
+				// basically "if not in our safe alphabet" 
+				throw new RuntimeException( "codePoint "+ asPoint
+						+" is not a valid base65536 char" );
+			}
+			int front = asPoint & MAX_BYTE;
+			int decodeKey = asPoint - front;
+			Integer back = decodeFromPoints.get( decodeKey );
+			if ( back == null )
+			{
+				throw new RuntimeException( "codePoint "+ asPoint
+						+" is not a valid base65536 char" );
+			}
+			else if ( back == LAST_BYTE_AS_PT && cpInd +1 < cpLim )
+			{
+				throw new RuntimeException( "codePoint "+ asPoint
+						+" has LAST_BYTE, but isn't at end" );
+			}
+			else
+			{
+				output.add( (byte)front );
+				output.add( (byte)(back.intValue() ) );
+			}
+			cpInd++;
+		}
+		byte[] actualOutput = new byte[ output.size() ]; // IMPROVE figure out the real size
+		int aoInd = 0;
+		for ( Byte next : output )
+		{
+			actualOutput[ aoInd ] = next;
+			aoInd++;
+		}
+		return actualOutput;
 	}
 
 
@@ -59,7 +141,7 @@ public class Base65536
 		}
 		if ( pointsToEncode.isEmpty() )
 		{
-			pointsToEncode.put( NO_BYTE, -1 );
+			pointsToEncode.put( LAST_BYTE_AS_IND, LAST_BYTE_AS_PT );
 			pointsToEncode.put(   0,  13_312 );
 			pointsToEncode.put(   1,  13_568 );
 			pointsToEncode.put(   2,  13_824 );
@@ -343,6 +425,301 @@ public class Base65536
 			pointsToEncode.put( 255, 165_120 );
 		}
 	}
+
+
+	protected static void ensureDecoderReady()
+	{
+		if ( decodeFromPoints == null )
+		{
+			decodeFromPoints = new HashMap<>( MAP_SIZE );
+		}
+		if ( decodeFromPoints.isEmpty() )
+		{
+			decodeFromPoints.put( LAST_BYTE_AS_PT, LAST_BYTE_AS_IND );
+			decodeFromPoints.put(  13_312,   0 );
+			decodeFromPoints.put(  13_568,   1 );
+			decodeFromPoints.put(  13_824,   2 );
+			decodeFromPoints.put(  14_080,   3 );
+			decodeFromPoints.put(  14_336,   4 );
+			decodeFromPoints.put(  14_592,   5 );
+			decodeFromPoints.put(  14_848,   6 );
+			decodeFromPoints.put(  15_104,   7 );
+			decodeFromPoints.put(  15_360,   8 );
+			decodeFromPoints.put(  15_616,   9 );
+
+			decodeFromPoints.put(  15_872,  10 );
+			decodeFromPoints.put(  16_128,  11 );
+			decodeFromPoints.put(  16_384,  12 );
+			decodeFromPoints.put(  16_640,  13 );
+			decodeFromPoints.put(  16_896,  14 );
+			decodeFromPoints.put(  17_152,  15 );
+			decodeFromPoints.put(  17_408,  16 );
+			decodeFromPoints.put(  17_664,  17 );
+			decodeFromPoints.put(  17_920,  18 );
+			decodeFromPoints.put(  18_176,  19 );
+
+			decodeFromPoints.put(  18_432,  20 );
+			decodeFromPoints.put(  18_688,  21 );
+			decodeFromPoints.put(  18_944,  22 );
+			decodeFromPoints.put(  19_200,  23 );
+			decodeFromPoints.put(  19_456,  24 );
+			decodeFromPoints.put(  19_968,  25 );
+			decodeFromPoints.put(  20_224,  26 );
+			decodeFromPoints.put(  20_480,  27 );
+			decodeFromPoints.put(  20_736,  28 );
+			decodeFromPoints.put(  20_992,  29 );
+
+			decodeFromPoints.put(  21_248,  30 );
+			decodeFromPoints.put(  21_504,  31 );
+			decodeFromPoints.put(  21_760,  32 );
+			decodeFromPoints.put(  22_016,  33 );
+			decodeFromPoints.put(  22_272,  34 );
+			decodeFromPoints.put(  22_528,  35 );
+			decodeFromPoints.put(  22_784,  36 );
+			decodeFromPoints.put(  23_040,  37 );
+			decodeFromPoints.put(  23_296,  38 );
+			decodeFromPoints.put(  23_552,  39 );
+
+			decodeFromPoints.put(  23_808,  40 );
+			decodeFromPoints.put(  24_064,  41 );
+			decodeFromPoints.put(  24_320,  42 );
+			decodeFromPoints.put(  24_576,  43 );
+			decodeFromPoints.put(  24_832,  44 );
+			decodeFromPoints.put(  25_088,  45 );
+			decodeFromPoints.put(  25_344,  46 );
+			decodeFromPoints.put(  25_600,  47 );
+			decodeFromPoints.put(  25_856,  48 );
+			decodeFromPoints.put(  26_112,  49 );
+
+			decodeFromPoints.put(  26_368,  50 );
+			decodeFromPoints.put(  26_624,  51 );
+			decodeFromPoints.put(  26_880,  52 );
+			decodeFromPoints.put(  27_136,  53 );
+			decodeFromPoints.put(  27_392,  54 );
+			decodeFromPoints.put(  27_648,  55 );
+			decodeFromPoints.put(  27_904,  56 );
+			decodeFromPoints.put(  28_160,  57 );
+			decodeFromPoints.put(  28_416,  58 );
+			decodeFromPoints.put(  28_672,  59 );
+
+			decodeFromPoints.put(  28_928,  60 );
+			decodeFromPoints.put(  29_184,  61 );
+			decodeFromPoints.put(  29_440,  62 );
+			decodeFromPoints.put(  29_696,  63 );
+			decodeFromPoints.put(  29_952,  64 );
+			decodeFromPoints.put(  30_208,  65 );
+			decodeFromPoints.put(  30_464,  66 );
+			decodeFromPoints.put(  30_720,  67 );
+			decodeFromPoints.put(  30_976,  68 );
+			decodeFromPoints.put(  31_232,  69 );
+
+			decodeFromPoints.put(  31_488,  70 );
+			decodeFromPoints.put(  31_744,  71 );
+			decodeFromPoints.put(  32_000,  72 );
+			decodeFromPoints.put(  32_256,  73 );
+			decodeFromPoints.put(  32_512,  74 );
+			decodeFromPoints.put(  32_768,  75 );
+			decodeFromPoints.put(  33_024,  76 );
+			decodeFromPoints.put(  33_280,  77 );
+			decodeFromPoints.put(  33_536,  78 );
+			decodeFromPoints.put(  33_792,  79 );
+
+			decodeFromPoints.put(  34_048,  80 );
+			decodeFromPoints.put(  34_304,  81 );
+			decodeFromPoints.put(  34_560,  82 );
+			decodeFromPoints.put(  34_816,  83 );
+			decodeFromPoints.put(  35_072,  84 );
+			decodeFromPoints.put(  35_328,  85 );
+			decodeFromPoints.put(  35_584,  86 );
+			decodeFromPoints.put(  35_840,  87 );
+			decodeFromPoints.put(  36_096,  88 );
+			decodeFromPoints.put(  36_352,  89 );
+
+			decodeFromPoints.put(  36_608,  90 );
+			decodeFromPoints.put(  36_864,  91 );
+			decodeFromPoints.put(  37_120,  92 );
+			decodeFromPoints.put(  37_376,  93 );
+			decodeFromPoints.put(  37_632,  94 );
+			decodeFromPoints.put(  37_888,  95 );
+			decodeFromPoints.put(  38_144,  96 );
+			decodeFromPoints.put(  38_400,  97 );
+			decodeFromPoints.put(  38_656,  98 );
+			decodeFromPoints.put(  38_912,  99 );
+
+			decodeFromPoints.put(  39_168, 100 );
+			decodeFromPoints.put(  39_424, 101 );
+			decodeFromPoints.put(  39_680, 102 );
+			decodeFromPoints.put(  39_936, 103 );
+			decodeFromPoints.put(  40_192, 104 );
+			decodeFromPoints.put(  40_448, 105 );
+			decodeFromPoints.put(  41_216, 106 );
+			decodeFromPoints.put(  41_472, 107 );
+			decodeFromPoints.put(  41_728, 108 );
+			decodeFromPoints.put(  42_240, 109 );
+
+			decodeFromPoints.put(  67_072, 110 );
+			decodeFromPoints.put(  73_728, 111 );
+			decodeFromPoints.put(  73_984, 112 );
+			decodeFromPoints.put(  74_240, 113 );
+			decodeFromPoints.put(  77_824, 114 );
+			decodeFromPoints.put(  78_080, 115 );
+			decodeFromPoints.put(  78_336, 116 );
+			decodeFromPoints.put(  78_592, 117 );
+			decodeFromPoints.put(  82_944, 118 );
+			decodeFromPoints.put(  83_200, 119 );
+
+			decodeFromPoints.put(  92_160, 120 );
+			decodeFromPoints.put(  92_416, 121 );
+			decodeFromPoints.put( 131_072, 122 );
+			decodeFromPoints.put( 131_328, 123 );
+			decodeFromPoints.put( 131_584, 124 );
+			decodeFromPoints.put( 131_840, 125 );
+			decodeFromPoints.put( 132_096, 126 );
+			decodeFromPoints.put( 132_352, 127 );
+			decodeFromPoints.put( 132_608, 128 );
+			decodeFromPoints.put( 132_864, 129 );
+
+			decodeFromPoints.put( 133_120, 130 );
+			decodeFromPoints.put( 133_376, 131 );
+			decodeFromPoints.put( 133_632, 132 );
+			decodeFromPoints.put( 133_888, 133 );
+			decodeFromPoints.put( 134_144, 134 );
+			decodeFromPoints.put( 134_400, 135 );
+			decodeFromPoints.put( 134_656, 136 );
+			decodeFromPoints.put( 134_912, 137 );
+			decodeFromPoints.put( 135_168, 138 );
+			decodeFromPoints.put( 135_424, 139 );
+
+			decodeFromPoints.put( 135_680, 140 );
+			decodeFromPoints.put( 135_936, 141 );
+			decodeFromPoints.put( 136_192, 142 );
+			decodeFromPoints.put( 136_448, 143 );
+			decodeFromPoints.put( 136_704, 144 );
+			decodeFromPoints.put( 136_960, 145 );
+			decodeFromPoints.put( 137_216, 146 );
+			decodeFromPoints.put( 137_472, 147 );
+			decodeFromPoints.put( 137_728, 148 );
+			decodeFromPoints.put( 137_984, 149 );
+
+			decodeFromPoints.put( 138_240, 150 );
+			decodeFromPoints.put( 138_496, 151 );
+			decodeFromPoints.put( 138_752, 152 );
+			decodeFromPoints.put( 139_008, 153 );
+			decodeFromPoints.put( 139_264, 154 );
+			decodeFromPoints.put( 139_520, 155 );
+			decodeFromPoints.put( 139_776, 156 );
+			decodeFromPoints.put( 140_032, 157 );
+			decodeFromPoints.put( 140_288, 158 );
+			decodeFromPoints.put( 140_544, 159 );
+
+			decodeFromPoints.put( 140_800, 160 );
+			decodeFromPoints.put( 141_056, 161 );
+			decodeFromPoints.put( 141_312, 162 );
+			decodeFromPoints.put( 141_568, 163 );
+			decodeFromPoints.put( 141_824, 164 );
+			decodeFromPoints.put( 142_080, 165 );
+			decodeFromPoints.put( 142_336, 166 );
+			decodeFromPoints.put( 142_592, 167 );
+			decodeFromPoints.put( 142_848, 168 );
+			decodeFromPoints.put( 143_104, 169 );
+
+			decodeFromPoints.put( 143_360, 170 );
+			decodeFromPoints.put( 143_616, 171 );
+			decodeFromPoints.put( 143_872, 172 );
+			decodeFromPoints.put( 144_128, 173 );
+			decodeFromPoints.put( 144_384, 174 );
+			decodeFromPoints.put( 144_640, 175 );
+			decodeFromPoints.put( 144_896, 176 );
+			decodeFromPoints.put( 145_152, 177 );
+			decodeFromPoints.put( 145_408, 178 );
+			decodeFromPoints.put( 145_664, 179 );
+
+			decodeFromPoints.put( 145_920, 180 );
+			decodeFromPoints.put( 146_176, 181 );
+			decodeFromPoints.put( 146_432, 182 );
+			decodeFromPoints.put( 146_688, 183 );
+			decodeFromPoints.put( 146_944, 184 );
+			decodeFromPoints.put( 147_200, 185 );
+			decodeFromPoints.put( 147_456, 186 );
+			decodeFromPoints.put( 147_712, 187 );
+			decodeFromPoints.put( 147_968, 188 );
+			decodeFromPoints.put( 148_224, 189 );
+
+			decodeFromPoints.put( 148_480, 190 );
+			decodeFromPoints.put( 148_736, 191 );
+			decodeFromPoints.put( 148_992, 192 );
+			decodeFromPoints.put( 149_248, 193 );
+			decodeFromPoints.put( 149_504, 194 );
+			decodeFromPoints.put( 149_760, 195 );
+			decodeFromPoints.put( 150_016, 196 );
+			decodeFromPoints.put( 150_272, 197 );
+			decodeFromPoints.put( 150_528, 198 );
+			decodeFromPoints.put( 150_784, 199 );
+
+			decodeFromPoints.put( 151_040, 200 );
+			decodeFromPoints.put( 151_296, 201 );
+			decodeFromPoints.put( 151_552, 202 );
+			decodeFromPoints.put( 151_808, 203 );
+			decodeFromPoints.put( 152_064, 204 );
+			decodeFromPoints.put( 152_320, 205 );
+			decodeFromPoints.put( 152_576, 206 );
+			decodeFromPoints.put( 152_832, 207 );
+			decodeFromPoints.put( 153_088, 208 );
+			decodeFromPoints.put( 153_344, 209 );
+
+			decodeFromPoints.put( 153_600, 210 );
+			decodeFromPoints.put( 153_856, 211 );
+			decodeFromPoints.put( 154_112, 212 );
+			decodeFromPoints.put( 154_368, 213 );
+			decodeFromPoints.put( 154_624, 214 );
+			decodeFromPoints.put( 154_880, 215 );
+			decodeFromPoints.put( 155_136, 216 );
+			decodeFromPoints.put( 155_392, 217 );
+			decodeFromPoints.put( 155_648, 218 );
+			decodeFromPoints.put( 155_904, 219 );
+
+			decodeFromPoints.put( 156_160, 220 );
+			decodeFromPoints.put( 156_416, 221 );
+			decodeFromPoints.put( 156_672, 222 );
+			decodeFromPoints.put( 156_928, 223 );
+			decodeFromPoints.put( 157_184, 224 );
+			decodeFromPoints.put( 157_440, 225 );
+			decodeFromPoints.put( 157_696, 226 );
+			decodeFromPoints.put( 157_952, 227 );
+			decodeFromPoints.put( 158_208, 228 );
+			decodeFromPoints.put( 158_464, 229 );
+
+			decodeFromPoints.put( 158_720, 230 );
+			decodeFromPoints.put( 158_976, 231 );
+			decodeFromPoints.put( 159_232, 232 );
+			decodeFromPoints.put( 159_488, 233 );
+			decodeFromPoints.put( 159_744, 234 );
+			decodeFromPoints.put( 160_000, 235 );
+			decodeFromPoints.put( 160_256, 236 );
+			decodeFromPoints.put( 160_512, 237 );
+			decodeFromPoints.put( 160_768, 238 );
+			decodeFromPoints.put( 161_024, 239 );
+
+			decodeFromPoints.put( 161_280, 240 );
+			decodeFromPoints.put( 161_536, 241 );
+			decodeFromPoints.put( 161_792, 242 );
+			decodeFromPoints.put( 162_048, 243 );
+			decodeFromPoints.put( 162_304, 244 );
+			decodeFromPoints.put( 162_560, 245 );
+			decodeFromPoints.put( 162_816, 246 );
+			decodeFromPoints.put( 163_072, 247 );
+			decodeFromPoints.put( 163_328, 248 );
+			decodeFromPoints.put( 163_584, 249 );
+
+			decodeFromPoints.put( 163_840, 250 );
+			decodeFromPoints.put( 164_096, 251 );
+			decodeFromPoints.put( 164_352, 252 );
+			decodeFromPoints.put( 164_608, 253 );
+			decodeFromPoints.put( 164_864, 254 );
+			decodeFromPoints.put( 165_120, 255 );
+		}
+	}
+
 
 }
 

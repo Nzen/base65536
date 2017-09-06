@@ -22,12 +22,16 @@ public class ValidatesBase65536
 	private void testStuff()
 	{
 		String sourceHello = "hello world";
-		showBytesOf( sourceHello );
-		showCodePointsOf( Base65536.encode( sourceHello.getBytes() ) );
+		//showCodePointsOf( sourceHello );
+		//showCodePointsOf( Base65536.encode( sourceHello.getBytes() ) );
 		String canonHello = "驨ꍬ啯𒁷ꍲᕤ";
-		showCodePointsOf( canonHello );
+		//showCodePointsOf( canonHello );
 		// String notHello = "鵨ꍬ???饤";
 		// showCodePointsOf( notHello );
+		String doneTwice = new String(Base65536.decode( Base65536.encode( sourceHello.getBytes() ) ));
+		showBytesOf( doneTwice );
+		showBytesOf( sourceHello );
+		System.out.println( "ch is "+ doneTwice );
 	}
 
 	/**
