@@ -10,28 +10,42 @@ public class Base65536
 {
 	protected static final int NO_BYTE = -1; 
 	protected static Map<Integer, Integer> pointsToEncode
-			= new HashMap<>(); // FIX these are shorts in the example
+			= new HashMap<>(); // FIX these are shorts in the example ;; actually short key ; int val
 
 
 	public static String encode( byte[] input )
 	{
 		ensureEncodeMapReady();
 		StringBuilder result = new StringBuilder( input.length / 2 );
-		int front, back; // example has these as shorts
+		short front;
+		int back;
 		for ( int ind = 0; ind < input.length; ind += 2 )
 		{
-			front = (int)input[ ind ];
-			if ( ind +1 > input.length )
+			if ( ind == input.length -2 || ind == input.length -3 )
 			{
-				back = pointsToEncode.get( NO_BYTE );
+				System.out.println( "--debug" );
+			}
+			front = (short)input[ ind ];
+			if ( ind +1 >= input.length )
+			{
+				back = -1;
 			}
 			else
 			{
-				back = (int)input[ ind ];
+				back = input[ ind +1 ];
 			}
-			char[] fromCodePoint = Character.toChars( front + back );
-			// 4TESTS extracted for debugging; only expecting one char
-			result.append( fromCodePoint[ 0 ] );
+			System.out.print( "f"+ front +",b"+ back );
+			Integer halfEncodedCodePoint = pointsToEncode.get( back );
+			System.out.print( "  cp"+ (front + halfEncodedCodePoint) );
+			char[] fromCodePoint = Character.toChars( front + halfEncodedCodePoint );
+			// 4TESTS extracted for debugging
+			for ( char nn : fromCodePoint )
+			{
+				System.out.print( "  => "+ nn );
+			}
+			System.out.println();
+			short onlyOneCharExpected = 0;
+			result.append( fromCodePoint[ onlyOneCharExpected ] );
 		}
 		return result.toString();
 	}
